@@ -55,8 +55,11 @@ _SUBSTITUTIONS: list[tuple[str, re.Pattern]] = [
     ("<PATH>", re.compile(r"\b[A-Za-z]:\\(?:[^\\\s]+\\?)+")),         # C:\Temp\x.log
     # alphanumeric tokens of 8+ chars mixing letters and digits: txn9f8a7b2c, AKIA3F...
     ("<ID>", re.compile(r"\b(?=[A-Za-z0-9]*\d)(?=[A-Za-z0-9]*[A-Za-z])[A-Za-z0-9]{8,}\b")),
-    # whole numeric tokens only: "order=98765" -> "order=<NUM>", but "abc123" is left alone
-    ("<NUM>", re.compile(r"(?<![A-Za-z0-9<.])[-+]?\d+(?:\.\d+)?(?![A-Za-z0-9>])")),
+    # Whole numeric tokens only ("order=98765" -> "order=<NUM>", "abc123" untouched).
+    # Short integers (1-3 digits: HTTP codes, retry counts, percentages) are kept —
+    # Drain turns them into <*> when they vary and preserves them when they are
+    # constant, so "502 Bad Gateway" survives while "attempt 3/5" generalises.
+    ("<NUM>", re.compile(r"(?<![A-Za-z0-9<.])[-+]?(?:\d+\.\d+|\d{4,})(?![A-Za-z0-9>])")),
 ]
 _RE_WS = re.compile(r"\s+")
 
@@ -203,24 +206,24 @@ def _vote_template(messages: Sequence[str], weights: Sequence[int]) -> str:
 def tfidf_cluster(unique_msgs: Sequence[str], counts: Sequence[int], similarity: float) -> np.ndarray:
     """Cluster unique normalised messages; returns a label per unique message."""
     from sklearn.cluster import AgglomerativeClustering
-    from sklearn.feature_extraction.text import TfidfVectorizer
+    from sklearn.feature_extraction.text import CountVectorizer
+    from sklearn.preprocessing import normalize
 
     n = len(unique_msgs)
     if n == 1:
         return np.zeros(1, dtype=int)
 
-    # Binary token presence *without* IDF: IDF would up-weight exactly the
-    # one-off tokens (ids, hashes) that should be ignored. ``min_df=2`` drops
-    # tokens seen in a single message, which removes most leftover variables.
-    def _vectorise(min_df: int):
-        vec = TfidfVectorizer(token_pattern=r"[^\s]+", lowercase=True, use_idf=False,
-                              binary=True, norm="l2", min_df=min_df)
-        return vec.fit_transform(unique_msgs)
-
-    try:
-        matrix = _vectorise(min_df=2)
-    except ValueError:  # every token unique -> empty vocabulary
-        matrix = _vectorise(min_df=1)
+    # Binary token presence *without* IDF weighting: IDF would up-weight exactly
+    # the one-off tokens (ids, hashes) that should be ignored. Instead, tokens
+    # that occur in a single *log line* overall are dropped — those are leftover
+    # variables the normaliser missed and can never help group anything.
+    vectoriser = CountVectorizer(token_pattern=r"[^\s]+", lowercase=True, binary=True)
+    matrix = vectoriser.fit_transform(unique_msgs).astype(float)
+    support = np.asarray(matrix.T @ np.asarray(counts, dtype=float)).ravel()  # lines per token
+    keep = np.flatnonzero(support >= 2)
+    if len(keep):
+        matrix = matrix[:, keep]
+    matrix = normalize(matrix, norm="l2")  # rows -> unit length (zero rows stay zero)
 
     # Cluster the most frequent strings; assign the long tail to the nearest centroid.
     order = np.argsort(-np.asarray(counts))
