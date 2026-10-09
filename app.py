@@ -361,7 +361,8 @@ def main() -> None:  # noqa: C901 - a straightforward top-to-bottom UI script
     st.success(
         f"### {plural(stats['total_lines'], 'line')} → {plural(len(incidents), 'incident')}{extra}\n"
         f"`{st.session_state.log_name}` · {plural(len(cand), 'line')} at {min_sev}+ collapsed from "
-        f"{plural(stats['n_unique'], 'distinct message')} into {plural(len(inc), 'group')} in {stats['seconds']:.2f} s"
+        f"{plural(stats['n_unique'], 'distinct message')} into {plural(len(inc), 'group')} — "
+        f"analysed in {stats['seconds']:.2f} s"
     )
     k = st.columns(6)
     k[0].metric("Lines in file", f"{stats['total_lines']:,}")
@@ -369,7 +370,15 @@ def main() -> None:  # noqa: C901 - a straightforward top-to-bottom UI script
     k[2].metric("Skipped", f"{stats['skipped']:,}", help="lines without a recognisable timestamp")
     k[3].metric(f"{min_sev}+ lines", f"{len(cand):,}")
     k[4].metric("Services", f"{df['service'].nunique()}")
-    k[5].metric("Time span", fmt_duration(span_s), help=f"{t0:%Y-%m-%d %H:%M:%S} → {t1:%Y-%m-%d %H:%M:%S}")
+    # Period covered by the log's own timestamps (first → last line). This is
+    # NOT how long the analysis took — that is reported in the banner above.
+    k[5].metric(
+        "Log covers",
+        fmt_duration(span_s),
+        help=f"Period between the first and last timestamp in the log: "
+        f"{t0:%Y-%m-%d %H:%M:%S} → {t1:%Y-%m-%d %H:%M:%S}. "
+        f"Not the processing time (that is shown in the banner).",
+    )
 
     if trigger_row is not None:
         knock_ons = incidents[incidents["role"] == "knock-on"]
