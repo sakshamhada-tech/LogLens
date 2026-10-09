@@ -252,11 +252,11 @@ def render_card(row: pd.Series, lines: pd.DataFrame, colour: str, weights: dict,
 
 
 # --------------------------------------------------------------------------- #
-# Sidebar: data source + settings
+# Page: sidebar (data source + settings) and main view
 # --------------------------------------------------------------------------- #
 
-def main() -> None:  # noqa: C901 - straightforward top-to-bottom UI script
-
+def main() -> None:  # noqa: C901 - a straightforward top-to-bottom UI script
+    """Render the whole page: sidebar inputs, then the analysis results."""
     st.session_state.setdefault("log_text", None)
     st.session_state.setdefault("log_name", None)
 
@@ -301,11 +301,7 @@ def main() -> None:  # noqa: C901 - straightforward top-to-bottom UI script
                        for k, v in DEFAULT_WEIGHTS.items()}
         show_background = st.checkbox("Show background-noise groups", value=True)
 
-
-    # --------------------------------------------------------------------------- #
-    # Main view
-    # --------------------------------------------------------------------------- #
-
+    # --- Main view ----------------------------------------------------------------
     st.title("🔎 LogLens")
     st.markdown("**From 10,000 near-identical log lines to the handful of incidents that matter — "
                 "grouped without rules, ranked by impact, with the likely trigger called out.**")
