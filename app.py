@@ -104,6 +104,10 @@ def fmt_duration(seconds: float) -> str:
     return f"{seconds / 86400:.1f} d"
 
 
+def plural(n: int, word: str) -> str:
+    return f"{n:,} {word}{'' if n == 1 else 's'}"
+
+
 def fmt_growth(row: pd.Series) -> str:
     if row["count_earlier"] == 0:
         return "new"
@@ -357,11 +361,11 @@ def main() -> None:  # noqa: C901 - straightforward top-to-bottom UI script
     n_services_total = int(cand["service"].nunique())
 
     # --- Summary banner ---------------------------------------------------------
-    extra = f" (+{len(background)} background noise groups)" if len(background) else ""
+    extra = f" (+{plural(len(background), 'background noise group')})" if len(background) else ""
     st.success(
-        f"### {stats['total_lines']:,} lines → {len(incidents)} incident{'s' if len(incidents) != 1 else ''}{extra}\n"
-        f"`{st.session_state.log_name}` · {len(cand):,} lines at {min_sev}+ collapsed from "
-        f"{stats['n_unique']:,} distinct messages into {len(inc)} groups in {stats['seconds']:.2f} s"
+        f"### {plural(stats['total_lines'], 'line')} → {plural(len(incidents), 'incident')}{extra}\n"
+        f"`{st.session_state.log_name}` · {plural(len(cand), 'line')} at {min_sev}+ collapsed from "
+        f"{plural(stats['n_unique'], 'distinct message')} into {plural(len(inc), 'group')} in {stats['seconds']:.2f} s"
     )
     k = st.columns(6)
     k[0].metric("Lines in file", f"{stats['total_lines']:,}")
